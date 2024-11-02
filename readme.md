@@ -31,8 +31,19 @@ Usage: gocat [-i] [filename]...
 ---------------------------------------------------
 version: 1.0.0
   -i    Execute with -i to read from stdin if no files are provided
-
 ```
+
+## ts
+```text
+---------------------------------------------------
+Usage:
+  no parameters          : Prints the current time as a Unix timestamp
+  <unix timestamp>       : Converts the Unix timestamp to UTC and local date time
+  <YYYY-MM-DD HH:MM:SS>  : Converts the date time to a Unix timestamp
+  -h, --help             : Prints this help message
+---------------------------------------------------
+```
+
 ### TODO
 1. Add > redirection
 2. Add >> redirection
