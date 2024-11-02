@@ -40,5 +40,13 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
+:: Build ts.go into ts.exe
+echo Building ncsv.exe...
+go build -o ncsv.exe ts.go
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to build ncsv.exe
+    exit /b 1
+)
+
 echo Build completed successfully.
 exit /b 0
