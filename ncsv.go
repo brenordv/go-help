@@ -14,24 +14,6 @@ import (
 	"time"
 )
 
-// Normalize CSV tool
-// 1. if --header <value> or -e <value> is passed, will use value as the header. This must be a string with the header columns separated by commas.
-// 2. If --header(-e) is not passed, will use the first line of the file as the header.
-// 3. The filename will be informed with the argument --file <path to file> (or -f <path to file>). If not informed, will fail execution.
-// 4. With the header info, will read all the other lines, and try to fit the data into the header columns.
-// 5. If a line has more columns than the header, will ignore the extra columns.
-// 6. If a line has less columns than the header, will fill the missing columns with empty strings.
-// 7. Any time there's a mismatch between the header and the line, will add that info to a mismatches.text file.
-// 8. In the mismatches file, will add the line number, the header columns, and the line columns.
-// 9. The output will be a new file with the same name as the input file, but with the suffix "_normalized".
-// 10. The output file will have the same header as the input file.
-// 11. The output file will have all the lines normalized according to the header.
-// 12. Optionally, the argument --split <number> (or -s <number)> can be passed, to split the output file in multiple files with the number of lines passed. (Pay attention to odd numbers. In the end 1005 of the lines of the input file must be saved to the output files.)
-// 13. When splitting the output, the resulting files will have the same name as the input file, but with the suffix "_normalized_<number>".
-// 14. The output file or files will always have the extension csv.
-// 15. Make safe use of channels, wait groups, and go routines to process the data. Always assume the input file can be huge and it must be done as fast as possible.
-// 16. While processing the file, print the progress to the console. You can use the fmt package for that and show the number of lines processed.
-
 type LineData struct {
 	LineNumber int
 	Record     []string
