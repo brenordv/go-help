@@ -56,6 +56,14 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
+:: Build get-lines.go into get-lines.exe for Windows
+echo Building get-lines for Linux...
+go build -o dist\linux\get-lines get-lines.go
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to build get-lines for Linux
+    exit /b 1
+)
+
 :: Set GOOS and GOARCH for Windows builds
 set GOOS=windows
 set GOARCH=amd64
@@ -97,6 +105,14 @@ echo Building ncsv for Windows...
 go build -o dist\windows\ncsv.exe ncsv.go
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to build ncsv for Windows
+    exit /b 1
+)
+
+:: Build get-lines.go into get-lines.exe for Windows
+echo Building get-lines for Windows...
+go build -o dist\windows\get-lines.exe get-lines.go
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to build get-lines for Windows
     exit /b 1
 )
 
