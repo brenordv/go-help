@@ -12,11 +12,33 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 type LineData struct {
 	LineNumber int
 	Record     []string
+}
+
+func cleanInvalidUTF8(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError && size == 1 {
+			// Invalid UTF-8 byte sequence; skip or replace
+			i++
+			// Uncomment the next line to replace invalid bytes with '�' (Unicode replacement character)
+			// b.WriteRune('�')
+			continue // Skip invalid byte
+		}
+		b.WriteRune(r)
+		i += size
+	}
+	return b.String()
 }
 
 func main() {
@@ -34,6 +56,8 @@ func main() {
 	printEveryArgShort := flag.Int("p", 500, "Print status every X lines (short)")
 	concurrencyArg := flag.Int("concurrency", 1000, "Concurrency level (buffer sizes)")
 	concurrencyArgShort := flag.Int("c", 1000, "Concurrency level (buffer sizes) (short)")
+	cleanStringArg := flag.Bool("clean-string", false, "Enable UTF-8 text cleaning (may slow down processing)")
+	cleanStringArgShort := flag.Bool("l", false, "Enable UTF-8 text cleaning (short)")
 
 	flag.Parse()
 
@@ -69,6 +93,13 @@ func main() {
 	concurrency := *concurrencyArg
 	if concurrency == 1000 {
 		concurrency = *concurrencyArgShort
+	}
+
+	// Determine clean string
+	cleanString := *cleanStringArg || *cleanStringArgShort
+
+	if cleanString {
+		fmt.Println("Warning: UTF-8 text cleaning is enabled. Processing will take considerably longer.")
 	}
 
 	// Open the input file
@@ -134,6 +165,14 @@ func main() {
 				record := lineData.Record
 				lineNum := lineData.LineNumber
 
+				if cleanString {
+					// Clean each field in the record
+					for i := range record {
+						record[i] = cleanInvalidUTF8(record[i])
+					}
+				}
+
+				// Adjust record length
 				if len(record) > len(header) {
 					record = record[:len(header)]
 					mismatchesChan <- fmt.Sprintf("Line %d: Extra columns detected. Header: %d columns, Line: %d columns\n", lineNum, len(header), len(lineData.Record))
@@ -143,6 +182,7 @@ func main() {
 					}
 					mismatchesChan <- fmt.Sprintf("Line %d: Missing columns detected. Header: %d columns, Line: %d columns\n", lineNum, len(header), len(lineData.Record))
 				}
+
 				resultsChan <- LineData{
 					LineNumber: lineNum,
 					Record:     record,
