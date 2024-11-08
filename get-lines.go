@@ -5,19 +5,20 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 )
 
 func main() {
 	// Command-line flags
-	searchPtr := flag.String("search", "", "Text to search for (case-insensitive)")
+	searchPtr := flag.String("search", "", "Comma-separated list of texts to search for (case-insensitive)")
 	searchAlias := flag.String("s", "", "Alias for --search")
 
 	filePtr := flag.String("file", "", "Input file name")
 	fileAlias := flag.String("f", "", "Alias for --file")
 
-	outputPtr := flag.String("output", "", "Output file name")
+	outputPtr := flag.String("output", "", "Output folder name")
 	outputAlias := flag.String("o", "", "Alias for --output")
 
 	workersPtr := flag.Int("workers", 1, "Number of workers for parallel processing")
@@ -72,6 +73,21 @@ func main() {
 		fmt.Println("Note: Output will not be in the same order as the input due to parallel processing.")
 	}
 
+	// Parse search terms
+	rawTerms := strings.Split(searchValue, ",")
+	searchTerms := make([]string, 0, len(rawTerms))
+	for _, term := range rawTerms {
+		trimmedTerm := strings.TrimSpace(strings.ToLower(term))
+		if trimmedTerm != "" {
+			searchTerms = append(searchTerms, trimmedTerm)
+		}
+	}
+
+	if len(searchTerms) == 0 {
+		fmt.Println("Error: No valid search terms provided.")
+		return
+	}
+
 	// Open input file
 	file, err := os.Open(fileName)
 	if err != nil {
@@ -80,36 +96,79 @@ func main() {
 	}
 	defer file.Close()
 
-	// Prepare output
-	var output *os.File
+	// Prepare outputs
+	var outputFiles map[string]*os.File
+	var outputChans map[string]chan string
+	var outputWg sync.WaitGroup
+
+	outputFiles = make(map[string]*os.File)
+	outputChans = make(map[string]chan string)
+
 	if outputName != "" {
-		output, err = os.Create(outputName)
+		// Create output directory if it doesn't exist
+		err = os.MkdirAll(outputName, os.ModePerm)
 		if err != nil {
-			fmt.Printf("Error: Unable to create output file %s\n", outputName)
+			fmt.Printf("Error: Unable to create output directory %s\n", outputName)
 			return
 		}
-		defer output.Close()
+
+		for _, term := range searchTerms {
+			outputFilePath := filepath.Join(outputName, term+".txt")
+			outputFile, err := os.Create(outputFilePath)
+			if err != nil {
+				fmt.Printf("Error: Unable to create output file %s\n", outputFilePath)
+				return
+			}
+			outputFiles[term] = outputFile
+
+			// Create a channel and start a goroutine to write to the file
+			outputChans[term] = make(chan string, workers*2)
+			outputWg.Add(1)
+			go func(ch chan string, file *os.File) {
+				defer outputWg.Done()
+				for line := range ch {
+					_, err := file.WriteString(line)
+					if err != nil {
+						fmt.Printf("Error: Unable to write to output file %s\n", file.Name())
+						return
+					}
+				}
+			}(outputChans[term], outputFile)
+		}
 	} else {
-		output = os.Stdout
+		// Prepare channels for console output
+		for _, term := range searchTerms {
+			outputChans[term] = make(chan string, workers*2)
+			outputWg.Add(1)
+			go func(ch chan string, term string) {
+				defer outputWg.Done()
+				for line := range ch {
+					fmt.Printf("[%s] %s", term, line)
+				}
+			}(outputChans[term], term)
+		}
 	}
 
 	// Channels and WaitGroup for concurrency
 	lines := make(chan string, workers*2)
-	results := make(chan string, workers*2)
-	var wg sync.WaitGroup
+	var workerWg sync.WaitGroup
 
 	// Start worker goroutines
 	for i := 0; i < workers; i++ {
-		wg.Add(1)
+		workerWg.Add(1)
 		go func() {
-			defer wg.Done()
+			defer workerWg.Done()
 			for line := range lines {
 				parts := strings.SplitN(line, "\t", 2)
 				lineNum := parts[0]
 				content := parts[1]
+				lowerContent := strings.ToLower(content)
 
-				if strings.Contains(strings.ToLower(content), strings.ToLower(searchValue)) {
-					results <- fmt.Sprintf("%s\t%s\n", lineNum, content)
+				for _, term := range searchTerms {
+					if strings.Contains(lowerContent, term) {
+						resultLine := fmt.Sprintf("%s\t%s\n", lineNum, content)
+						outputChans[term] <- resultLine
+					}
 				}
 			}
 		}()
@@ -127,18 +186,21 @@ func main() {
 		close(lines)
 	}()
 
-	// Collect results
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
+	// Wait for workers to finish processing
+	workerWg.Wait()
 
-	// Write results to output
-	for result := range results {
-		_, err := output.WriteString(result)
-		if err != nil {
-			fmt.Printf("Error: Unable to write to output\n")
-			return
+	// Close output channels
+	for _, ch := range outputChans {
+		close(ch)
+	}
+
+	// Wait for output goroutines to finish
+	outputWg.Wait()
+
+	// Close output files
+	if outputName != "" {
+		for _, file := range outputFiles {
+			file.Close()
 		}
 	}
 }

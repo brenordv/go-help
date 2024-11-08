@@ -77,3 +77,24 @@ Usage: ncsv [options]
   --concurrency, -c <num> : Concurrency level (buffer sizes) (default: 1000)
 ---------------------------------------------------
 ```
+
+## get-lines
+Searches for specific text within a file and outputs the lines containing the text. Supports parallel processing for 
+faster search.
+
+```text
+---------------------------------------------------
+Usage: get-lines [options]
+  --search, -s <value>    : Comma-separated list of texts to search for (case-insensitive) (required)
+  --file, -f <path>       : Path to the input file (required)
+  --output, -o <path>     : Output folder name (optional)
+  --workers, -w <number>  : Number of workers for parallel processing (default: 1)
+  --help, -h              : Display help information
+---------------------------------------------------
+```
+
+Example:
+```shell
+get-lines -s "error,warning" -f "C:\path\to\file.log" -o "C:\path\to\output" -w 4
+```
+Result: The output folder will contain two files: `error.txt` and `warning.txt` with the lines containing the words
